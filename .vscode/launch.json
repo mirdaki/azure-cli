@@ -5,11 +5,34 @@
             "name": "Azure CLI Debug (Integrated Console)",
             "type": "python",
             "request": "launch",
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${workspaceRoot}/src/azure-cli/azure/cli/__main__.py",
             "cwd": "${workspaceRoot}",
             "args": [
-                "--help"
+                "find",
+                "vm"
+            ],
+            "console": "integratedTerminal",
+            "debugOptions": [
+                "WaitOnAbnormalExit",
+                "WaitOnNormalExit",
+                "RedirectOutput"
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Azure CLI Debug 2 (Integrated Console)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "${command:python.interpreterPath}",
+            "program": "${workspaceRoot}/src/azure-cli/azure/cli/__main__.py",
+            "cwd": "${workspaceRoot}",
+            "args": [
+                "acr",
+                "login",
+                "-n",
+                "aladdinmodel",
+                "--expose-token"
             ],
             "console": "integratedTerminal",
             "debugOptions": [
@@ -24,7 +47,7 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${workspaceRoot}/src/azure-cli/azure/cli/__main__.py",
             "cwd": "${workspaceRoot}",
             "args": [
@@ -40,7 +63,7 @@
             "name": "Azdev Scripts",
             "type": "python",
             "request": "launch",
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${command:python.interpreterPath}",
             "program": "${workspaceRoot}/tools/automation/__main__.py",
             "cwd": "${workspaceRoot}",
             "args": [
