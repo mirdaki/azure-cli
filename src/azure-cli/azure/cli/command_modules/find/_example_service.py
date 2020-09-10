@@ -7,14 +7,25 @@ import re
 import json
 
 
-from azure.cli.command_modules.find.aladdin_service import call_aladdin_service
-from azure.cli.command_modules.find.aladdin_service import API_VERSION
+from azure.cli.command_modules.find._aladdin_service import API_VERSION
+from azure.cli.command_modules.find._aladdin_service import call_aladdin_service
 
 
 EXAMPLE_ENDPOINT = 'examples'
 
 
 Example = namedtuple("Example", "title snippet")
+
+
+def get_generated_examples(cli_term):
+    examples = []
+    response = call_aladdin_service(cli_term)
+
+    if response.status_code == 200:
+        for answer in json.loads(response.content):
+            examples.append(clean_from_http_answer(answer))
+
+    return examples
 
 
 def get_lenient_examples(cli_term):
