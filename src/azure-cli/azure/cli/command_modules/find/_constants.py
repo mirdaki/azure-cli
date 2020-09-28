@@ -16,7 +16,7 @@ ARTIFACT_FILE_NAME = (
     'aladdinExamplesModel{}.json'
 )
 ARTIFACT_FORMAT_VERSION = (
-    'v1.0'
+    'v1.1'
 )
 
 CONFIG_HEADER = (
