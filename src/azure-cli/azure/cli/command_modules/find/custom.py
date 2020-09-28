@@ -13,7 +13,7 @@ import colorama
 
 from azure.cli.core import telemetry as telemetry_core
 from azure.cli.core import __version__ as core_version
-# from azure.cli.core.cloud import CLOUDS_FORBIDDING_ALADDIN_REQUEST
+from azure.cli.core.cloud import CLOUDS_FORBIDDING_ALADDIN_REQUEST
 from azure.cli.core.commands.constants import SURVEY_PROMPT
 
 from azure.cli.command_modules.find._acr_artifacts import download_artifact
@@ -63,8 +63,7 @@ def process_query(cmd, cli_term):
         artifact_file_path = config.config_dir
 
         # Use this to check if we are in an air-gapped cloud or not
-        # is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name not in CLOUDS_FORBIDDING_ALADDIN_REQUEST # TODO: Enable this once available in codebase
-        is_air_gapped_cloud = False
+        is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name not in CLOUDS_FORBIDDING_ALADDIN_REQUEST
 
         # Check if the offline model is enabled and exists, even a prior version
         model_file_path = get_model_file(artifact_file_path, ARTIFACT_FILE_NAME, cli_version)

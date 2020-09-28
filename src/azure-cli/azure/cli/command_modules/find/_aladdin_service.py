@@ -2,6 +2,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import hashlib
 import json
 from pkg_resources import parse_version
 import requests
@@ -13,7 +14,6 @@ from azure.cli.core import __version__ as core_version
 
 API_URL = 'https://app.aladdin.microsoft.com/api/{}/{}'
 API_VERSION = 'v1.0'
-HEADERS = {'Content-Type': 'application/json'}
 
 def get_context():
     version = str(parse_version(core_version))
@@ -36,6 +36,17 @@ def get_context():
     return context
 
 
+def get_headers():
+    headers = {'Content-Type': 'application/json'}
+
+    # Used for DDOS protection and rate limiting
+    user_id = telemetry_core._get_user_azure_id()  # pylint: disable=protected-access
+    hashed_user_id = hashlib.sha256(user_id.encode('utf-8')).hexdigest()
+    headers['X-UserId'] = hashed_user_id
+
+    return headers
+
+
 def call_aladdin_service(version, endpoint, additonal_params={}, retry_count=3, timeout_seconds=360): # pylint: disable=dangerous-default-value
     
     context = get_context()
@@ -45,6 +56,8 @@ def call_aladdin_service(version, endpoint, additonal_params={}, retry_count=3, 
         'context': json.dumps(context)
     }
     params = {**standard_params, **additonal_params}
+
+    headers = get_headers()
 
     retry_strategy = Retry(
         total=retry_count,
@@ -59,7 +72,7 @@ def call_aladdin_service(version, endpoint, additonal_params={}, retry_count=3, 
     response = requests.get(
         api_url,
         params=params,
-        headers=HEADERS)
+        headers=headers)
 
     return response
 

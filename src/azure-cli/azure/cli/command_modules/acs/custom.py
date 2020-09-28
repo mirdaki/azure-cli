@@ -56,20 +56,20 @@ from azure.graphrbac.models import (ApplicationCreateParameters,
 
 from azure.mgmt.containerservice.models import ContainerServiceOrchestratorTypes
 
-from azure.mgmt.containerservice.v2020_03_01.models import ContainerServiceNetworkProfile
-from azure.mgmt.containerservice.v2020_03_01.models import ContainerServiceLinuxProfile
-from azure.mgmt.containerservice.v2020_03_01.models import ManagedClusterServicePrincipalProfile
-from azure.mgmt.containerservice.v2020_03_01.models import ContainerServiceSshConfiguration
-from azure.mgmt.containerservice.v2020_03_01.models import ContainerServiceSshPublicKey
-from azure.mgmt.containerservice.v2020_03_01.models import ContainerServiceStorageProfileTypes
-from azure.mgmt.containerservice.v2020_03_01.models import ManagedCluster
-from azure.mgmt.containerservice.v2020_03_01.models import ManagedClusterAADProfile
-from azure.mgmt.containerservice.v2020_03_01.models import ManagedClusterAddonProfile
-from azure.mgmt.containerservice.v2020_03_01.models import ManagedClusterAgentPoolProfile
-from azure.mgmt.containerservice.v2020_03_01.models import ManagedClusterIdentity
-from azure.mgmt.containerservice.v2020_03_01.models import AgentPool
-from azure.mgmt.containerservice.v2020_03_01.models import ManagedClusterSKU
-from azure.mgmt.containerservice.v2020_03_01.models import ManagedClusterWindowsProfile
+from azure.mgmt.containerservice.v2020_09_01.models import ContainerServiceNetworkProfile
+from azure.mgmt.containerservice.v2020_09_01.models import ContainerServiceLinuxProfile
+from azure.mgmt.containerservice.v2020_09_01.models import ManagedClusterServicePrincipalProfile
+from azure.mgmt.containerservice.v2020_09_01.models import ContainerServiceSshConfiguration
+from azure.mgmt.containerservice.v2020_09_01.models import ContainerServiceSshPublicKey
+from azure.mgmt.containerservice.v2020_09_01.models import ContainerServiceStorageProfileTypes
+from azure.mgmt.containerservice.v2020_09_01.models import ManagedCluster
+from azure.mgmt.containerservice.v2020_09_01.models import ManagedClusterAADProfile
+from azure.mgmt.containerservice.v2020_09_01.models import ManagedClusterAddonProfile
+from azure.mgmt.containerservice.v2020_09_01.models import ManagedClusterAgentPoolProfile
+from azure.mgmt.containerservice.v2020_09_01.models import ManagedClusterIdentity
+from azure.mgmt.containerservice.v2020_09_01.models import AgentPool
+from azure.mgmt.containerservice.v2020_09_01.models import ManagedClusterSKU
+from azure.mgmt.containerservice.v2020_09_01.models import ManagedClusterWindowsProfile
 
 from azure.mgmt.containerservice.v2019_09_30_preview.models import OpenShiftManagedClusterAgentPoolProfile
 from azure.mgmt.containerservice.v2019_09_30_preview.models import OpenShiftAgentPoolProfileRole
@@ -88,6 +88,7 @@ from ._client_factory import get_graph_rbac_management_client
 from ._client_factory import cf_resources
 from ._client_factory import get_resource_by_name
 from ._client_factory import cf_container_registry_service
+from ._client_factory import cf_managed_clusters
 
 from ._helpers import (_populate_api_server_access_profile, _set_vm_set_type, _set_outbound_type,
                        _parse_comma_separated_list)
@@ -450,170 +451,6 @@ def k8s_install_kubelogin(cmd, client_version='latest', install_location=None):
     else:
         logger.warning('Please ensure that %s is in your search PATH, so the `%s` command can be found.',
                        install_dir, cli)
-
-
-def k8s_install_connector(cmd, client, name, resource_group_name, connector_name='aci-connector',
-                          location=None, service_principal=None, client_secret=None,
-                          chart_url=None, os_type='Linux', image_tag=None, aci_resource_group=None):
-    _k8s_install_or_upgrade_connector("install", cmd, client, name, resource_group_name, connector_name,
-                                      location, service_principal, client_secret, chart_url, os_type,
-                                      image_tag, aci_resource_group)
-
-
-def k8s_upgrade_connector(cmd, client, name, resource_group_name, connector_name='aci-connector',
-                          location=None, service_principal=None, client_secret=None,
-                          chart_url=None, os_type='Linux', image_tag=None, aci_resource_group=None):
-    _k8s_install_or_upgrade_connector("upgrade", cmd, client, name, resource_group_name, connector_name,
-                                      location, service_principal, client_secret, chart_url, os_type,
-                                      image_tag, aci_resource_group)
-
-
-def _k8s_install_or_upgrade_connector(helm_cmd, cmd, client, name, resource_group_name, connector_name,
-                                      location, service_principal, client_secret, chart_url, os_type,
-                                      image_tag, aci_resource_group):
-    from subprocess import PIPE, Popen
-    instance = client.get(resource_group_name, name)
-    helm_not_installed = 'Helm not detected, please verify if it is installed.'
-    url_chart = chart_url
-    if image_tag is None:
-        image_tag = 'latest'
-    # Check if Helm is installed locally
-    try:
-        Popen(["helm"], stdout=PIPE, stderr=PIPE)
-    except OSError:
-        raise CLIError(helm_not_installed)
-    # If SPN is specified, the secret should also be specified
-    if service_principal is not None and client_secret is None:
-        raise CLIError('--client-secret must be specified when --service-principal is specified')
-    # Validate if the RG exists
-    rg_location = _get_rg_location(cmd.cli_ctx, aci_resource_group or resource_group_name)
-    # Auto assign the location
-    if location is None:
-        location = rg_location
-    norm_location = location.replace(' ', '').lower()
-    # Validate the location upon the ACI avaiable regions
-    _validate_aci_location(norm_location)
-    # Get the credentials from a AKS instance
-    _, browse_path = tempfile.mkstemp()
-    aks_get_credentials(cmd, client, resource_group_name, name, admin=False, path=browse_path)
-    subscription_id = get_subscription_id(cmd.cli_ctx)
-    # Get the TenantID
-    profile = Profile(cli_ctx=cmd.cli_ctx)
-    _, _, tenant_id = profile.get_login_credentials()
-    # Check if we want the linux connector
-    if os_type.lower() in ['linux', 'both']:
-        _helm_install_or_upgrade_aci_connector(helm_cmd, image_tag, url_chart, connector_name, service_principal,
-                                               client_secret, subscription_id, tenant_id, aci_resource_group,
-                                               norm_location, 'Linux', instance.enable_rbac, instance.fqdn)
-
-    # Check if we want the windows connector
-    if os_type.lower() in ['windows', 'both']:
-        _helm_install_or_upgrade_aci_connector(helm_cmd, image_tag, url_chart, connector_name, service_principal,
-                                               client_secret, subscription_id, tenant_id, aci_resource_group,
-                                               norm_location, 'Windows', instance.enable_rbac, instance.fqdn)
-
-
-def _helm_install_or_upgrade_aci_connector(helm_cmd, image_tag, url_chart, connector_name, service_principal,
-                                           client_secret, subscription_id, tenant_id, aci_resource_group,
-                                           norm_location, os_type, use_rbac, masterFqdn):
-    rbac_install = "true" if use_rbac else "false"
-    node_taint = 'azure.com/aci'
-    helm_release_name = connector_name.lower() + '-' + os_type.lower() + '-' + norm_location
-    node_name = 'virtual-kubelet-' + helm_release_name
-    k8s_master = 'https://{}'.format(masterFqdn)
-    logger.warning("Deploying the ACI connector for '%s' using Helm", os_type)
-    try:
-        values = 'env.nodeName={},env.nodeTaint={},env.nodeOsType={},image.tag={},rbac.install={}'.format(
-            node_name, node_taint, os_type, image_tag, rbac_install)
-        if service_principal:
-            values += ",env.azureClientId=" + service_principal
-        if client_secret:
-            values += ",env.azureClientKey=" + client_secret
-        if subscription_id:
-            values += ",env.azureSubscriptionId=" + subscription_id
-        if tenant_id:
-            values += ",env.azureTenantId=" + tenant_id
-        if aci_resource_group:
-            values += ",env.aciResourceGroup=" + aci_resource_group
-        if norm_location:
-            values += ",env.aciRegion=" + norm_location
-        # Currently, we need to set the master FQDN.
-        # This is temporary and we should remove it when possible
-        values += ",env.masterUri=" + k8s_master
-        if helm_cmd == "install":
-            subprocess.call(["helm", "install", url_chart, "--name", helm_release_name, "--set", values])
-        elif helm_cmd == "upgrade":
-            subprocess.call(["helm", "upgrade", helm_release_name, url_chart, "--set", values])
-    except subprocess.CalledProcessError as err:
-        raise CLIError('Could not deploy the ACI connector Chart: {}'.format(err))
-
-
-def k8s_uninstall_connector(cmd, client, name, resource_group_name, connector_name='aci-connector',
-                            location=None, graceful=False, os_type='Linux'):
-    from subprocess import PIPE, Popen
-    helm_not_installed = "Error : Helm not detected, please verify if it is installed."
-    # Check if Helm is installed locally
-    try:
-        Popen(["helm"], stdout=PIPE, stderr=PIPE)
-    except OSError:
-        raise CLIError(helm_not_installed)
-    # Get the credentials from a AKS instance
-    _, browse_path = tempfile.mkstemp()
-    aks_get_credentials(cmd, client, resource_group_name, name, admin=False, path=browse_path)
-
-    # Validate if the RG exists
-    rg_location = _get_rg_location(cmd.cli_ctx, resource_group_name)
-    # Auto assign the location
-    if location is None:
-        location = rg_location
-    norm_location = location.replace(' ', '').lower()
-
-    if os_type.lower() in ['linux', 'both']:
-        helm_release_name = connector_name.lower() + '-linux-' + norm_location
-        node_name = 'virtual-kubelet-' + helm_release_name
-        _undeploy_connector(graceful, node_name, helm_release_name)
-
-    if os_type.lower() in ['windows', 'both']:
-        helm_release_name = connector_name.lower() + '-windows-' + norm_location
-        node_name = 'virtual-kubelet-' + helm_release_name
-        _undeploy_connector(graceful, node_name, helm_release_name)
-
-
-def _undeploy_connector(graceful, node_name, helm_release_name):
-    if graceful:
-        logger.warning('Graceful option selected, will try to drain the node first')
-        from subprocess import PIPE, Popen
-        kubectl_not_installed = 'Kubectl not detected, please verify if it is installed.'
-        try:
-            Popen(["kubectl"], stdout=PIPE, stderr=PIPE)
-        except OSError:
-            raise CLIError(kubectl_not_installed)
-
-        try:
-            drain_node = subprocess.check_output(
-                ['kubectl', 'drain', node_name, '--force', '--delete-local-data'],
-                universal_newlines=True)
-
-            if not drain_node:
-                raise CLIError('Could not find the node, make sure you' +
-                               ' are using the correct --os-type')
-        except subprocess.CalledProcessError as err:
-            raise CLIError('Could not find the node, make sure you are using the correct' +
-                           ' --connector-name, --location and --os-type options: {}'.format(err))
-
-    logger.warning("Undeploying the '%s' using Helm", helm_release_name)
-    try:
-        subprocess.call(['helm', 'del', helm_release_name, '--purge'])
-    except subprocess.CalledProcessError as err:
-        raise CLIError('Could not undeploy the ACI connector Chart: {}'.format(err))
-
-    try:
-        subprocess.check_output(
-            ['kubectl', 'delete', 'node', node_name],
-            universal_newlines=True)
-    except subprocess.CalledProcessError as err:
-        raise CLIError('Could not delete the node, make sure you are using the correct' +
-                       ' --connector-name, --location and --os-type options: {}'.format(err))
 
 
 def _build_service_principal(rbac_client, cli_ctx, name, url, client_secret):
@@ -1214,7 +1051,7 @@ def _k8s_get_credentials_internal(name, acs_info, path, ssh_key_file, overwrite_
 def _handle_merge(existing, addition, key, replace):
     if not addition.get(key, False):
         return
-    if existing[key] is None:
+    if not existing.get(key):
         existing[key] = addition[key]
         return
 
@@ -1610,11 +1447,16 @@ def aks_browse(cmd, client, resource_group_name, name, disable_browser=False,
     # verify the kube-dashboard addon was not disabled
     instance = client.get(resource_group_name, name)
     addon_profiles = instance.addon_profiles or {}
-    addon_profile = addon_profiles.get("kubeDashboard", ManagedClusterAddonProfile(enabled=True))
+    # addon name is case insensitive
+    addon_profile = next((addon_profiles[k] for k in addon_profiles if k.lower() == 'kubeDashboard'.lower()),
+                         ManagedClusterAddonProfile(enabled=False))
     if not addon_profile.enabled:
         raise CLIError('The kube-dashboard addon was disabled for this managed cluster.\n'
-                       'To use "az aks browse" first enable the add-on\n'
-                       'by running "az aks enable-addons --addons kube-dashboard".')
+                       'To use "az aks browse" first enable the add-on '
+                       'by running "az aks enable-addons --addons kube-dashboard".\n'
+                       'Starting with Kubernetes 1.19, AKS no longer support installation of '
+                       'the managed kube-dashboard addon.\n'
+                       'Please use the Kubernetes resources view in the Azure portal (preview) instead.')
 
     _, browse_path = tempfile.mkstemp()
     aks_get_credentials(cmd, client, resource_group_name, name, admin=False, path=browse_path)
@@ -1745,9 +1587,11 @@ def aks_create(cmd, client, resource_group_name, name, ssh_key_value,  # pylint:
                admin_username="azureuser",
                windows_admin_username=None,
                windows_admin_password=None,
+               enable_ahub=False,
                kubernetes_version='',
                node_vm_size="Standard_DS2_v2",
                node_osdisk_size=0,
+               node_osdisk_diskencryptionset_id=None,
                node_count=3,
                nodepool_name="nodepool1",
                nodepool_tags=None,
@@ -1759,6 +1603,7 @@ def aks_create(cmd, client, resource_group_name, name, ssh_key_value,  # pylint:
                vm_set_type=None,
                skip_subnet_role_assignment=False,
                enable_cluster_autoscaler=False,
+               cluster_autoscaler_profile=None,
                network_plugin=None,
                network_policy=None,
                uptime_sla=False,
@@ -1793,6 +1638,7 @@ def aks_create(cmd, client, resource_group_name, name, ssh_key_value,  # pylint:
                attach_acr=None,
                enable_aad=False,
                aad_admin_group_object_ids=None,
+               aci_subnet_name=None,
                no_wait=False):
     _validate_ssh_key(no_ssh_key, ssh_key_value)
     subscription_id = get_subscription_id(cmd.cli_ctx)
@@ -1856,9 +1702,14 @@ def aks_create(cmd, client, resource_group_name, name, ssh_key_value,  # pylint:
                 raise CLIError(
                     'Please specify both username and password in non-interactive mode.')
 
+        windows_license_type = None
+        if enable_ahub:
+            windows_license_type = 'Windows_Server'
+
         windows_profile = ManagedClusterWindowsProfile(
             admin_username=windows_admin_username,
-            admin_password=windows_admin_password)
+            admin_password=windows_admin_password,
+            license_type=windows_license_type)
 
     # Skip create service principal profile for the cluster if the cluster
     # enables managed identity and customer doesn't explicitly provide a service principal.
@@ -1938,6 +1789,10 @@ def aks_create(cmd, client, resource_group_name, name, ssh_key_value,  # pylint:
                 load_balancer_profile=load_balancer_profile,
                 outbound_type=outbound_type,
             )
+        if load_balancer_sku.lower() == "basic":
+            network_profile = ContainerServiceNetworkProfile(
+                load_balancer_sku=load_balancer_sku.lower(),
+            )
 
     addon_profiles = _handle_addons_args(
         cmd,
@@ -1945,7 +1800,9 @@ def aks_create(cmd, client, resource_group_name, name, ssh_key_value,  # pylint:
         subscription_id,
         resource_group_name,
         {},
-        workspace_resource_id
+        workspace_resource_id,
+        aci_subnet_name,
+        vnet_subnet_id
     )
     monitoring = False
     if 'omsagent' in addon_profiles:
@@ -2006,8 +1863,10 @@ def aks_create(cmd, client, resource_group_name, name, ssh_key_value,  # pylint:
         network_profile=network_profile,
         addon_profiles=addon_profiles,
         aad_profile=aad_profile,
+        auto_scaler_profile=cluster_autoscaler_profile,
         api_server_access_profile=api_server_access_profile,
-        identity=identity
+        identity=identity,
+        disk_encryption_set_id=node_osdisk_diskencryptionset_id
     )
 
     if uptime_sla:
@@ -2151,7 +2010,8 @@ ADDONS = {
     'http_application_routing': 'httpApplicationRouting',
     'monitoring': 'omsagent',
     'virtual-node': 'aciConnector',
-    'kube-dashboard': 'kubeDashboard'
+    'kube-dashboard': 'kubeDashboard',
+    'azure-policy': 'azurepolicy'
 }
 
 
@@ -2227,6 +2087,7 @@ def aks_update(cmd, client, resource_group_name, name,
                enable_cluster_autoscaler=False,
                disable_cluster_autoscaler=False,
                update_cluster_autoscaler=False,
+               cluster_autoscaler_profile=None,
                min_count=None, max_count=None,
                uptime_sla=False,
                load_balancer_managed_outbound_ip_count=None,
@@ -2240,6 +2101,8 @@ def aks_update(cmd, client, resource_group_name, name,
                enable_aad=False,
                aad_tenant_id=None,
                aad_admin_group_object_ids=None,
+               enable_ahub=False,
+               disable_ahub=False,
                no_wait=False):
     update_autoscaler = enable_cluster_autoscaler + disable_cluster_autoscaler + update_cluster_autoscaler
     update_lb_profile = is_load_balancer_profile_provided(load_balancer_managed_outbound_ip_count,
@@ -2249,16 +2112,20 @@ def aks_update(cmd, client, resource_group_name, name,
                                                           load_balancer_idle_timeout)
     update_aad_profile = not (aad_tenant_id is None and aad_admin_group_object_ids is None)
     # pylint: disable=too-many-boolean-expressions
-    if (update_autoscaler != 1 and not update_lb_profile and
+    if (update_autoscaler != 1 and cluster_autoscaler_profile is None and
+            not update_lb_profile and
             not attach_acr and
             not detach_acr and
             not uptime_sla and
             api_server_authorized_ip_ranges is None and
             not enable_aad and
-            not update_aad_profile):
+            not update_aad_profile and
+            not enable_ahub and
+            not disable_ahub):
         raise CLIError('Please specify one or more of "--enable-cluster-autoscaler" or '
                        '"--disable-cluster-autoscaler" or '
                        '"--update-cluster-autoscaler" or '
+                       '"--cluster-autoscaler-profile" or '
                        '"--load-balancer-managed-outbound-ip-count" or'
                        '"--load-balancer-outbound-ips" or '
                        '"--load-balancer-outbound-ip-prefixes" or'
@@ -2269,7 +2136,9 @@ def aks_update(cmd, client, resource_group_name, name,
                        '"--api-server-authorized-ip-ranges" or '
                        '"--enable-aad" or '
                        '"--aad-tenant-id" or '
-                       '"--aad-admin-group-object-ids"')
+                       '"--aad-admin-group-object-ids" or '
+                       '"--enable-ahub" or '
+                       '"--disable-ahub"')
 
     instance = client.get(resource_group_name, name)
     # For multi-agent pool, use the az aks nodepool command
@@ -2305,6 +2174,16 @@ def aks_update(cmd, client, resource_group_name, name,
         instance.agent_pool_profiles[0].enable_auto_scaling = False
         instance.agent_pool_profiles[0].min_count = None
         instance.agent_pool_profiles[0].max_count = None
+
+    # if intention is to clear autoscaler profile
+    if cluster_autoscaler_profile == {}:
+        instance.auto_scaler_profile = {}
+    # else profile is provided, update instance profile if it exists
+    elif cluster_autoscaler_profile:
+        instance.auto_scaler_profile = _update_dict(instance.auto_scaler_profile.__dict__,
+                                                    dict((key.replace("-", "_"), value)
+                                                         for (key, value) in cluster_autoscaler_profile.items())) \
+            if instance.auto_scaler_profile else cluster_autoscaler_profile
 
     subscription_id = get_subscription_id(cmd.cli_ctx)
 
@@ -2369,17 +2248,57 @@ def aks_update(cmd, client, resource_group_name, name,
         if aad_admin_group_object_ids is not None:
             instance.aad_profile.admin_group_object_ids = _parse_comma_separated_list(aad_admin_group_object_ids)
 
+    if enable_ahub and disable_ahub:
+        raise CLIError('Cannot specify "--enable-ahub" and "--disable-ahub" at the same time')
+
+    if enable_ahub:
+        instance.windows_profile.license_type = 'Windows_Server'
+    if disable_ahub:
+        instance.windows_profile.license_type = 'None'
+
     return sdk_no_wait(no_wait, client.create_or_update, resource_group_name, name, instance)
 
 
-# pylint: disable=unused-argument,inconsistent-return-statements
-def aks_upgrade(cmd, client, resource_group_name, name, kubernetes_version, control_plane_only=False,
-                no_wait=False, yes=False):
+# pylint: disable=unused-argument,inconsistent-return-statements,too-many-return-statements
+def aks_upgrade(cmd,
+                client,
+                resource_group_name, name,
+                kubernetes_version='',
+                control_plane_only=False,
+                node_image_only=False,
+                no_wait=False,
+                yes=False):
     msg = 'Kubernetes may be unavailable during cluster upgrades.\n Are you sure you want to perform this operation?'
     if not yes and not prompt_y_n(msg, default="n"):
         return None
 
     instance = client.get(resource_group_name, name)
+
+    vmas_cluster = False
+    for agent_profile in instance.agent_pool_profiles:
+        if agent_profile.type.lower() == "availabilityset":
+            vmas_cluster = True
+            break
+
+    if kubernetes_version != '' and node_image_only:
+        raise CLIError('Conflicting flags. Upgrading the Kubernetes version will also upgrade node image version. '
+                       'If you only want to upgrade the node version please use the "--node-image-only" option only.')
+
+    if node_image_only:
+        msg = "This node image upgrade operation will run across every node pool in the cluster" \
+              "and might take a while, do you wish to continue?"
+        if not yes and not prompt_y_n(msg, default="n"):
+            return None
+
+        # This only provide convenience for customer at client side so they can run az aks upgrade to upgrade all
+        # nodepools of a cluster. The SDK only support upgrade single nodepool at a time.
+        for agent_pool_profile in instance.agent_pool_profiles:
+            if vmas_cluster:
+                raise CLIError('This cluster is not using VirtualMachineScaleSets. Node image upgrade only operation '
+                               'can only be applied on VirtualMachineScaleSets cluster.')
+            _upgrade_single_nodepool_image_version(True, client, resource_group_name, name, agent_pool_profile.name)
+        mc = client.get(resource_group_name, name)
+        return _remove_nulls([mc])[0]
 
     if instance.kubernetes_version == kubernetes_version:
         if instance.provisioning_state == "Succeeded":
@@ -2392,12 +2311,6 @@ def aks_upgrade(cmd, client, resource_group_name, name, kubernetes_version, cont
 
     upgrade_all = False
     instance.kubernetes_version = kubernetes_version
-
-    vmas_cluster = False
-    for agent_profile in instance.agent_pool_profiles:
-        if agent_profile.type.lower() == "availabilityset":
-            vmas_cluster = True
-            break
 
     # for legacy clusters, we always upgrade node pools with CCP.
     if instance.max_agent_pools < 8 or vmas_cluster:
@@ -2429,6 +2342,10 @@ def aks_upgrade(cmd, client, resource_group_name, name, kubernetes_version, cont
     instance.aad_profile = None
 
     return sdk_no_wait(no_wait, client.create_or_update, resource_group_name, name, instance)
+
+
+def _upgrade_single_nodepool_image_version(no_wait, client, resource_group_name, cluster_name, nodepool_name):
+    return sdk_no_wait(no_wait, client.upgrade_node_image_version, resource_group_name, cluster_name, nodepool_name)
 
 
 DEV_SPACES_EXTENSION_NAME = 'dev-spaces'
@@ -2498,13 +2415,13 @@ def _update_addons(cmd, instance, subscription_id, resource_group_name, addons, 
     addon_args = addons.split(',')
 
     addon_profiles = instance.addon_profiles or {}
-    if 'kube-dashboard' in addon_args and 'kubeDashboard' not in addon_profiles:
-        addon_profiles['kubeDashboard'] = ManagedClusterAddonProfile(enabled=True)
 
     os_type = 'Linux'
 
     # for each addons argument
     for addon_arg in addon_args:
+        if addon_arg not in ADDONS:
+            raise CLIError("Invalid addon name: {}.".format(addon_arg))
         addon = ADDONS[addon_arg]
         if addon == 'aciConnector':
             # only linux is supported for now, in the future this will be a user flag
@@ -2543,7 +2460,10 @@ def _update_addons(cmd, instance, subscription_id, resource_group_name, addons, 
             addon_profiles[addon] = addon_profile
         else:
             if addon not in addon_profiles:
-                raise CLIError("The addon {} is not installed.".format(addon))
+                if addon == 'kubeDashboard':
+                    addon_profiles[addon] = ManagedClusterAddonProfile(enabled=False)
+                else:
+                    raise CLIError("The addon {} is not installed.".format(addon))
             addon_profiles[addon].config = None
         addon_profiles[addon].enabled = enable
 
@@ -2570,7 +2490,7 @@ def _get_azext_module(extension_name, module_name):
 
 
 def _handle_addons_args(cmd, addons_str, subscription_id, resource_group_name, addon_profiles=None,
-                        workspace_resource_id=None):
+                        workspace_resource_id=None, aci_subnet_name=None, vnet_subnet_id=None):
     if not addon_profiles:
         addon_profiles = {}
     addons = addons_str.split(',') if addons_str else []
@@ -2598,6 +2518,18 @@ def _handle_addons_args(cmd, addons_str, subscription_id, resource_group_name, a
     # error out if '--enable-addons=monitoring' isn't set but workspace_resource_id is
     elif workspace_resource_id:
         raise CLIError('"--workspace-resource-id" requires "--enable-addons monitoring".')
+    if 'azure-policy' in addons:
+        addon_profiles['azurepolicy'] = ManagedClusterAddonProfile(enabled=True)
+        addons.remove('azure-policy')
+    if 'virtual-node' in addons:
+        if not aci_subnet_name or not vnet_subnet_id:
+            raise CLIError('"--enable-addons virtual-node" requires "--aci-subnet-name" and "--vnet-subnet-id".')
+        # TODO: how about aciConnectorwindows, what is its addon name?
+        addon_profiles['aciConnectorLinux'] = ManagedClusterAddonProfile(
+            enabled=True,
+            config={'SubnetName': aci_subnet_name}
+        )
+        addons.remove('virtual-node')
     # error out if any (unrecognized) addons remain
     if addons:
         raise CLIError('"{}" {} not recognized by the --enable-addons argument.'.format(
@@ -3038,9 +2970,22 @@ def aks_agentpool_scale(cmd, client, resource_group_name, cluster_name,
 
 
 def aks_agentpool_upgrade(cmd, client, resource_group_name, cluster_name,
-                          kubernetes_version,
                           nodepool_name,
+                          kubernetes_version='',
+                          node_image_only=False,
                           no_wait=False):
+    if kubernetes_version != '' and node_image_only:
+        raise CLIError('Conflicting flags. Upgrading the Kubernetes version will also upgrade node image version.'
+                       'If you only want to upgrade the node version please use the "--node-image-only" option only.')
+
+    if node_image_only:
+        managed_cluster_client = cf_managed_clusters(cmd.cli_ctx)
+        return _upgrade_single_nodepool_image_version(no_wait,
+                                                      managed_cluster_client,
+                                                      resource_group_name,
+                                                      cluster_name,
+                                                      nodepool_name)
+
     instance = client.get(resource_group_name, cluster_name, nodepool_name)
     instance.orchestrator_version = kubernetes_version
 
