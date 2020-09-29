@@ -4,12 +4,10 @@
 # --------------------------------------------------------------------------------------------
 from __future__ import print_function
 
-import json
 import sys
 import platform
 import os.path
 import colorama
-
 
 from azure.cli.core import telemetry as telemetry_core
 from azure.cli.core import __version__ as core_version
@@ -21,7 +19,8 @@ from azure.cli.command_modules.find._constants import (
     ACR_NAME,
     ARTIFACT_PATH,
     ARTIFACT_TYPE,
-    ARTIFACT_FILE_NAME,
+    ARTIFACT_EXAMPLE_FILE_NAME,
+    ARTIFACT_FOLDER_NAME,
     ARTIFACT_FORMAT_VERSION,
     CONFIG_HEADER,
     CONFIG_SHOULD_DOWNLOAD_ARTIFACT,
@@ -59,14 +58,13 @@ def process_query(cmd, cli_term):
         # Collect values for model version
         config = cmd.cli_ctx.config
         cli_version = 'v{}'.format(telemetry_core._get_core_version())  # pylint: disable=protected-access
-        artifact_file_name = ARTIFACT_FILE_NAME.format(cli_version)
-        artifact_file_path = config.config_dir
+        artifact_file_path = os.path.join(config.config_dir, ARTIFACT_FOLDER_NAME, cli_version)
 
         # Use this to check if we are in an air-gapped cloud or not
         is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name in CLOUDS_FORBIDDING_ALADDIN_REQUEST
 
         # Check if the offline model is enabled and exists, even a prior version
-        model_file_path = get_model_file(artifact_file_path, ARTIFACT_FILE_NAME, cli_version)
+        model_file_path = get_model_file(artifact_file_path, ARTIFACT_EXAMPLE_FILE_NAME, cli_version)
         is_offline_config_set = config.has_option(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT)
         is_offline_enabled = "false" #is_offline_config_set and config.get(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT)
 
@@ -79,7 +77,7 @@ def process_query(cmd, cli_term):
 
         # Ask about enabling the model
         if not is_offline_config_set:
-            offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artifact_file_name, False)
+            offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, ARTIFACT_EXAMPLE_FILE_NAME, False)
 
     # Wrap up message
     print(MESSAGE_CHANGE_MODEL_DOWNLOAD_CONFIG.format(config.config_path, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_HEADER))
@@ -117,8 +115,7 @@ def offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artif
     user_input = input(PROMPT_DOWNLOAD_MODEL)
     if user_input.lower() == 'y' or user_input.lower() == 'yes' or yes_flag:
         print(MESSAGE_MODEL_DOWNLOAD_START)
-        download_path = os.path.join(artifact_file_path, artifact_file_name)
-        download_success = download_artifact(download_path, ACR_NAME, ARTIFACT_PATH, ARTIFACT_FORMAT_VERSION, ARTIFACT_TYPE)  # pylint: disable=line-too-long
+        download_success = download_artifact(artifact_file_path, artifact_file_name, ACR_NAME, ARTIFACT_PATH, ARTIFACT_FORMAT_VERSION, ARTIFACT_TYPE)  # pylint: disable=line-too-long
         if download_success:
             config.set_value(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_ENABLE_VALUE)
             print(MESSAGE_MODEL_DOWNLOAD_END)

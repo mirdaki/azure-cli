@@ -5,13 +5,9 @@
 from __future__ import print_function
 
 import glob
-import httpx
 import os.path
 import re
 
-ACR_MANIFEST_URL = 'https://{}.azurecr.io/v2/public/{}/manifests/{}'
-ACR_TOKEN_URL = '{}?service={}&scope={}'
-ACR_BLOB_URL = 'https://{}.azurecr.io/v2/public/{}/blobs/{}'
 
 def get_model_file(file_path, file_name_pattern, file_version):
     full_path = os.path.join(file_path, file_name_pattern.format(file_version))
@@ -28,7 +24,6 @@ def get_model_file(file_path, file_name_pattern, file_version):
             return ""
 
 # Consider using an incremental JSON loading library for searching through the model https://pypi.org/project/ijson/
-
 
 
 def natural_sort(l): 

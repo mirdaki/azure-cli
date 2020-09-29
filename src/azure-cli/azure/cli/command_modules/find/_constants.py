@@ -12,8 +12,11 @@ ARTIFACT_PATH = (
 ARTIFACT_TYPE = (
     'application/vnd.microsoft.aladdin-model.cli.layer.v1.json'
 )
-ARTIFACT_FILE_NAME = (
-    'aladdinExamplesModel{}.json'
+ARTIFACT_EXAMPLE_FILE_NAME = (
+    'aladdinExamplesModel.json'
+)
+ARTIFACT_FOLDER_NAME = (
+    'aladdin'
 )
 ARTIFACT_FORMAT_VERSION = (
     'v1.1'

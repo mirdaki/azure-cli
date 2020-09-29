@@ -5,6 +5,7 @@
 from __future__ import print_function
 
 import httpx
+import os.path
 
 ACR_MANIFEST_URL = 'https://{}.azurecr.io/v2/public/{}/manifests/{}'
 ACR_TOKEN_URL = '{}?service={}&scope={}'
@@ -53,7 +54,7 @@ def get_artifact(acr_name, artifact_path, artifact_sha, artifact_type, acr_token
     }
     return httpx.get(api_url, headers=headers)
 
-def download_file(file_path, acr_name, artifact_path, artifact_sha, artifact_type, acr_token='default'):
+def download_file(file_path, file_name, acr_name, artifact_path, artifact_sha, artifact_type, acr_token='default'):
     api_url = ACR_BLOB_URL.format(acr_name, artifact_path, artifact_sha)
     headers = {
         'Accept': '{}, */*'.format(artifact_type),
@@ -62,9 +63,14 @@ def download_file(file_path, acr_name, artifact_path, artifact_sha, artifact_typ
         'Host': ACR_HOST_HEADER.format(acr_name),
         'Authorization': ACR_AUTHORIZATION_HEADER.format(acr_token)
     }
+
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    full_path = os.path.join(file_path, file_name)
+
     with httpx.stream("GET", api_url, headers=headers) as r:
         r.raise_for_status()
-        with open(file_path, 'wb') as f:
+        with open(full_path, 'wb') as f:
             for chunk in r.iter_bytes(): 
                 f.write(chunk)
 
@@ -84,8 +90,8 @@ def extract_manifest_sha(response):
 def extract_artifact_sha(response):
     return response.json()['layers'][0]['digest']
 
-# Return true if succsesful, false otherwise
-def download_artifact(file_path, acr_name, artifact_path, artifact_version, artifact_type):
+# Return true if successful, false otherwise
+def download_artifact(file_path, file_name, acr_name, artifact_path, artifact_version, artifact_type):
     try:
         ping_response = ping_acr(acr_name, artifact_path, artifact_version)
         (realm, service, scope) = extract_auth_values(ping_response)
@@ -97,7 +103,7 @@ def download_artifact(file_path, acr_name, artifact_path, artifact_version, arti
         manifest_sha = extract_manifest_sha(ping_response_auth)
         manifest_response = get_manifest(acr_name, artifact_path, manifest_sha, bearer_token)
         artifact_sha = extract_artifact_sha(manifest_response)
-        download_file(file_path, acr_name, artifact_path, artifact_sha, artifact_type, bearer_token)
+        download_file(file_path, file_name, acr_name, artifact_path, artifact_sha, artifact_type, bearer_token)
         return True
     except httpx.RequestError as exc:
         # TODO: Add some sort of logging and consider checking for other failures and excpetions
