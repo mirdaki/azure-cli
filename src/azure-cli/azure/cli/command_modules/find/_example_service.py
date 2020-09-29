@@ -7,7 +7,6 @@ import re
 import json
 
 
-from azure.cli.command_modules.find._aladdin_service import API_VERSION
 from azure.cli.command_modules.find._aladdin_service import call_aladdin_service
 
 
@@ -17,32 +16,33 @@ EXAMPLE_ENDPOINT = 'examples'
 Example = namedtuple("Example", "title snippet")
 
 
-def get_generated_examples(cli_term):
+# TODO: Should add json.dumps(cli_term) for all params?
+def get_examples(cli_term, strict):
     examples = []
-    response = call_aladdin_service(cli_term)
+    pruned_examples = False
+    call_successful = False
 
-    if response.status_code == 200:
-        for answer in json.loads(response.content):
-            examples.append(clean_from_http_answer(answer))
-
-    return examples
-
-
-def get_lenient_examples(cli_term):
     params = {
         'query': json.dumps(cli_term)
     }
-    return call_aladdin_service(API_VERSION, EXAMPLE_ENDPOINT, params)
+    if strict:
+        params['commandOnly'] = True
+        params['numberOfExamples'] = 5
 
+    response = call_aladdin_service(EXAMPLE_ENDPOINT, params)
 
-# TODO: Should add json.dumps(cli_term) for all params?
-def get_strict_examples(cli_term):
-    params = {
-        'query': json.dumps(cli_term),
-        'commandOnly': True,
-        'numberOfExamples': 5
-    }
-    return call_aladdin_service(API_VERSION, EXAMPLE_ENDPOINT, params)
+    if response and response.status_code == 200:
+        call_successful = True
+        answers = json.loads(response.content)
+
+        if answers and answers[0]['source'] == 'pruned':
+            pruned_examples = True
+            answers = answers[1:]
+
+        for answer in answers:
+            examples.append(clean_from_http_answer(answer))
+
+    return (call_successful, pruned_examples, examples)
 
 
 def clean_from_http_answer(http_answer):

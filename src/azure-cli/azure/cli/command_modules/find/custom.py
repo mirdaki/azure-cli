@@ -36,7 +36,7 @@ from azure.cli.command_modules.find._constants import (
     MESSAGE_WAIT,
     PROMPT_DOWNLOAD_MODEL
 )
-from azure.cli.command_modules.find._example_service import get_lenient_examples, clean_from_http_answer
+from azure.cli.command_modules.find._example_service import get_examples
 from azure.cli.command_modules.find._model_file import get_model_file
 from azure.cli.command_modules.find._style import style_message, should_enable_styling
 
@@ -63,7 +63,7 @@ def process_query(cmd, cli_term):
         artifact_file_path = config.config_dir
 
         # Use this to check if we are in an air-gapped cloud or not
-        is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name not in CLOUDS_FORBIDDING_ALADDIN_REQUEST
+        is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name in CLOUDS_FORBIDDING_ALADDIN_REQUEST
 
         # Check if the offline model is enabled and exists, even a prior version
         model_file_path = get_model_file(artifact_file_path, ARTIFACT_FILE_NAME, cli_version)
@@ -90,31 +90,25 @@ def process_query(cmd, cli_term):
 
 def query_example_service(cli_term):
     print(MESSAGE_WAIT, file=sys.stderr)
-    response = get_lenient_examples(cli_term)
+    (call_successful, pruned_examples, examples) = get_examples(cli_term, False)
 
-    if response.status_code != 200:
-        logger.error('Unexpected Error: If it persists, please file a bug.')
-    else:
+    if call_successful:
         if (platform.system() == 'Windows' and should_enable_styling()):
             colorama.init(convert=True)
-        has_pruned_answer = False
-        answer_list = json.loads(response.content)
-        if not answer_list:
+
+        if not examples:
             print("\nSorry I am not able to help with [" + cli_term + "]."
                   "\nTry typing the beginning of a command e.g. " + style_message('az vm') + ".", file=sys.stderr)
         else:
-            if answer_list[0]['source'] == 'pruned':
-                has_pruned_answer = True
-                answer_list.pop(0)
             print("\nHere are the most common ways to use [" + cli_term + "]: \n", file=sys.stderr)
-
-            for answer in answer_list:
-                cleaned_answer = clean_from_http_answer(answer)
-                print(style_message(cleaned_answer.title))
-                print(cleaned_answer.snippet + '\n')
-            if has_pruned_answer:
+            for example in examples:
+                print(style_message(example.title))
+                print(example.snippet + '\n')
+            if pruned_examples:
                 print(style_message("More commands and examples are available in the latest version of the CLI. "
                                     "Please update for the best experience.\n"))
+    else:
+        logger.error('Unexpected Error: If it persists, please file a bug.')
 
 
 def offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artifact_file_name, yes_flag):

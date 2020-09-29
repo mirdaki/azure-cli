@@ -4,8 +4,10 @@
 # --------------------------------------------------------------------------------------------
 import hashlib
 import json
-from pkg_resources import parse_version
 import requests
+
+from pkg_resources import parse_version
+from requests import Response
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
@@ -47,8 +49,8 @@ def get_headers():
     return headers
 
 
-def call_aladdin_service(version, endpoint, additonal_params={}, retry_count=3, timeout_seconds=360): # pylint: disable=dangerous-default-value
-    
+def call_aladdin_service(endpoint, additonal_params={}, version=API_VERSION, retry_count=3, timeout_seconds=360): # pylint: disable=dangerous-default-value
+
     context = get_context()
     api_url = API_URL.format(version, endpoint)
     standard_params = {
@@ -69,13 +71,18 @@ def call_aladdin_service(version, endpoint, additonal_params={}, retry_count=3, 
     http.mount("https://", adapter)
     http.mount("http://", adapter)
 
-    response = requests.get(
-        api_url,
-        params=params,
-        headers=headers)
+    try:
+        response = http.get(
+            api_url,
+            params=params,
+            headers=headers,
+            timeout=timeout_seconds)
+    except: # pylint: disable=bare-except
+        response = Response()
+        response.status_code = 503
 
     return response
 
 
 def ping_aladdin_service():
-    return call_aladdin_service(API_VERSION, 'monitor')
+    return call_aladdin_service('monitor')
