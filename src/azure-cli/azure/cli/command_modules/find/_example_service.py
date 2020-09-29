@@ -5,15 +5,11 @@
 import re
 import json
 
-from collections import namedtuple
-
 from azure.cli.command_modules.find._aladdin_service import call_aladdin_service
+from azure.cli.command_modules.find.Example import Example
 
 
 EXAMPLE_ENDPOINT = 'examples'
-
-
-Example = namedtuple("Example", "title snippet")
 
 
 # TODO: Should add json.dumps(cli_term) for all params?

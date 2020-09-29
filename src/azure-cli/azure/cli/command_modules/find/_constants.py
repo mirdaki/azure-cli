@@ -13,7 +13,7 @@ ARTIFACT_TYPE = (
     'application/vnd.microsoft.aladdin-model.cli.layer.v1.json'
 )
 ARTIFACT_EXAMPLE_FILE_NAME = (
-    'aladdinExamplesModel.json'
+    'aladdinExamplesModel{}.json'
 )
 ARTIFACT_FOLDER_NAME = (
     'aladdin'
@@ -29,10 +29,10 @@ CONFIG_SHOULD_DOWNLOAD_ARTIFACT = (
     'should_download_artifact'
 )
 CONFIG_ENABLE_VALUE = (
-    'true'
+    'True'
 )
 CONFIG_DISABLE_VALUE = (
-    'false'
+    'False'
 )
 
 EXTENSION_NAME = (

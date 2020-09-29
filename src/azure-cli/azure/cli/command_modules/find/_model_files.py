@@ -8,6 +8,7 @@ import glob
 import os.path
 import re
 
+# TODO: Should also delete old indexes
 
 def get_model_file(file_path, file_name_pattern, file_version):
     full_path = os.path.join(file_path, file_name_pattern.format(file_version))

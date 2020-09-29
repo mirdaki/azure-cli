@@ -36,7 +36,8 @@ from azure.cli.command_modules.find._constants import (
     PROMPT_DOWNLOAD_MODEL
 )
 from azure.cli.command_modules.find._example_service import get_examples
-from azure.cli.command_modules.find._model_file import get_model_file
+from azure.cli.command_modules.find._model_files import get_model_file
+from azure.cli.command_modules.find._example_model import search_examples
 from azure.cli.command_modules.find._style import style_message, should_enable_styling
 
 from knack.log import get_logger
@@ -58,7 +59,8 @@ def process_query(cmd, cli_term):
         # Collect values for model version
         config = cmd.cli_ctx.config
         cli_version = 'v{}'.format(telemetry_core._get_core_version())  # pylint: disable=protected-access
-        artifact_file_path = os.path.join(config.config_dir, ARTIFACT_FOLDER_NAME, cli_version)
+        artifact_file_name = ARTIFACT_EXAMPLE_FILE_NAME.format(cli_version)
+        artifact_file_path = os.path.join(config.config_dir, ARTIFACT_FOLDER_NAME)
 
         # Use this to check if we are in an air-gapped cloud or not
         is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name in CLOUDS_FORBIDDING_ALADDIN_REQUEST
@@ -66,18 +68,20 @@ def process_query(cmd, cli_term):
         # Check if the offline model is enabled and exists, even a prior version
         model_file_path = get_model_file(artifact_file_path, ARTIFACT_EXAMPLE_FILE_NAME, cli_version)
         is_offline_config_set = config.has_option(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT)
-        is_offline_enabled = "false" #is_offline_config_set and config.get(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT)
+        is_offline_enabled = is_offline_config_set and config.get(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT)
 
-        if is_offline_enabled.lower() == CONFIG_ENABLE_VALUE and model_file_path:
-            print("TODO")
+        if is_offline_enabled and model_file_path:
+            (call_successful, examples) = search_examples(artifact_file_path, artifact_file_name, cli_term, False)
+            print_examples(cli_term, call_successful, False, examples)
         elif not is_air_gapped_cloud:
-            query_example_service(cli_term)
+            (call_successful, pruned_examples, examples) = get_examples(cli_term, False)
+            print_examples(cli_term, call_successful, pruned_examples, examples)
         else:
             print(MESSAGE_AIR_GAPPED_MODEL)
 
         # Ask about enabling the model
         if not is_offline_config_set:
-            offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, ARTIFACT_EXAMPLE_FILE_NAME, False)
+            offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artifact_file_name, False)
 
     # Wrap up message
     print(MESSAGE_CHANGE_MODEL_DOWNLOAD_CONFIG.format(config.config_path, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_HEADER))
@@ -86,9 +90,8 @@ def process_query(cmd, cli_term):
     print(SURVEY_PROMPT)
 
 
-def query_example_service(cli_term):
+def print_examples(cli_term, call_successful, pruned_examples, examples):
     print(MESSAGE_WAIT, file=sys.stderr)
-    (call_successful, pruned_examples, examples) = get_examples(cli_term, False)
 
     if call_successful:
         if (platform.system() == 'Windows' and should_enable_styling()):
