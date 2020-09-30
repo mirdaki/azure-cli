@@ -18,9 +18,7 @@ ARTIFACT_EXAMPLE_FILE_NAME = (
 ARTIFACT_FOLDER_NAME = (
     'aladdin'
 )
-ARTIFACT_FORMAT_VERSION = (
-    'v1.1'
-)
+  
 
 CONFIG_HEADER = (
     'aladdin'

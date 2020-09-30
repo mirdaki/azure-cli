@@ -8,8 +8,6 @@ import glob
 import os.path
 import re
 
-# TODO: Should also delete old indexes
-
 
 def get_model_file(file_path, file_name_pattern, file_version):
     full_path = os.path.join(file_path, file_name_pattern.format(file_version))
@@ -24,7 +22,22 @@ def get_model_file(file_path, file_name_pattern, file_version):
         return matches[-1]
     return ""
 
-# Consider using an incremental JSON loading library for searching through the model https://pypi.org/project/ijson/
+
+def delete_model_files(files_to_delete):
+    for files in files_to_delete:
+        if os.path.isfile(files):
+            os.remove(files)
+
+
+def what_model_files_to_delete(file_path, file_name_pattern, last_used_file_full_path):
+    files_to_delete = []
+    glob_path = os.path.join(file_path, file_name_pattern.format('*'))
+    matches = glob.glob(glob_path)
+    matches = natural_sort(matches)
+    for match in matches:
+        if os.path.isfile(match) and match != last_used_file_full_path:
+            files_to_delete.append(match)
+    return files_to_delete
 
 
 def natural_sort(list_to_sort):

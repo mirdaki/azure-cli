@@ -14,14 +14,13 @@ from azure.cli.core import __version__ as core_version
 from azure.cli.core.cloud import CLOUDS_FORBIDDING_ALADDIN_REQUEST
 from azure.cli.core.commands.constants import SURVEY_PROMPT
 
-from azure.cli.command_modules.find._acr_artifacts import download_artifact
+from azure.cli.command_modules.find._acr_artifacts import download_artifact, does_current_cli_artifact_exist
 from azure.cli.command_modules.find._constants import (
     ACR_NAME,
     ARTIFACT_PATH,
     ARTIFACT_TYPE,
     ARTIFACT_EXAMPLE_FILE_NAME,
     ARTIFACT_FOLDER_NAME,
-    ARTIFACT_FORMAT_VERSION,
     CONFIG_HEADER,
     CONFIG_SHOULD_DOWNLOAD_ARTIFACT,
     CONFIG_ENABLE_VALUE,
@@ -36,7 +35,7 @@ from azure.cli.command_modules.find._constants import (
     PROMPT_DOWNLOAD_MODEL
 )
 from azure.cli.command_modules.find._example_service import get_examples
-from azure.cli.command_modules.find._model_files import get_model_file
+from azure.cli.command_modules.find._model_files import get_model_file, what_model_files_to_delete, delete_model_files
 from azure.cli.command_modules.find._example_model import search_examples
 from azure.cli.command_modules.find._style import style_message, should_enable_styling
 
@@ -66,22 +65,26 @@ def process_query(cmd, cli_term):
         is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name in CLOUDS_FORBIDDING_ALADDIN_REQUEST  # pylint: disable=line-too-long
 
         # Check if the offline model is enabled and exists, even a prior version
-        model_file_path = get_model_file(artifact_file_path, ARTIFACT_EXAMPLE_FILE_NAME, cli_version)
+        current_model_file_path = get_model_file(artifact_file_path, ARTIFACT_EXAMPLE_FILE_NAME, cli_version)
         is_offline_config_set = config.has_option(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT)
         is_offline_enabled = is_offline_config_set and config.get(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT)
 
-        if is_offline_enabled and model_file_path:
+        if is_offline_enabled and current_model_file_path:
             (call_successful, examples) = search_examples(artifact_file_path, artifact_file_name, cli_term, False)
             print_examples(cli_term, call_successful, False, examples)
         elif not is_air_gapped_cloud:
             (call_successful, pruned_examples, examples) = get_examples(cli_term, False)
             print_examples(cli_term, call_successful, pruned_examples, examples)
         else:
-            print(MESSAGE_AIR_GAPPED_MODEL)
+            print(MESSAGE_AIR_GAPPED_MODEL)        
+
+        # Check if there is a new model available, download it, and clean up old ones
+        if is_offline_config_set:
+            update_model_if_available(artifact_file_path, artifact_file_name, current_model_file_path, cli_version)  # pylint: disable=line-too-long
 
         # Ask about enabling the model
         if not is_offline_config_set:
-            offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artifact_file_name, False)
+            offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artifact_file_name, cli_version, False)  # pylint: disable=line-too-long
 
     # Wrap up message
     print(MESSAGE_CHANGE_MODEL_DOWNLOAD_CONFIG.format(config.config_path, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_HEADER))  # pylint: disable=line-too-long
@@ -112,13 +115,13 @@ def print_examples(cli_term, call_successful, pruned_examples, examples):
         logger.error('Unexpected Error: If it persists, please file a bug.')
 
 
-def offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artifact_file_name, yes_flag):
+def offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artifact_file_name, cli_version, yes_flag):
     if not is_air_gapped_cloud:
         print(MESSAGE_OFFLINE_MODEL)
     user_input = input(PROMPT_DOWNLOAD_MODEL)
     if user_input.lower() == 'y' or user_input.lower() == 'yes' or yes_flag:
         print(MESSAGE_MODEL_DOWNLOAD_START)
-        download_success = download_artifact(artifact_file_path, artifact_file_name, ACR_NAME, ARTIFACT_PATH, ARTIFACT_FORMAT_VERSION, ARTIFACT_TYPE)  # pylint: disable=line-too-long
+        download_success = download_artifact(artifact_file_path, artifact_file_name, ACR_NAME, ARTIFACT_PATH, cli_version, ARTIFACT_TYPE)  # pylint: disable=line-too-long
         if download_success:
             config.set_value(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_ENABLE_VALUE)
             print(MESSAGE_MODEL_DOWNLOAD_END)
@@ -126,3 +129,12 @@ def offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artif
             print(MESSAGE_MODEL_DOWNLOAD_ERROR)
     else:
         config.set_value(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_DISABLE_VALUE)
+
+
+# TODO: Look into running this asynchronously
+def update_model_if_available(artifact_file_path, artifact_file_name, current_model_file_path, cli_version):
+    if does_current_cli_artifact_exist(ACR_NAME, ARTIFACT_PATH, cli_version):
+        download_success = download_artifact(artifact_file_path, artifact_file_name, ACR_NAME, ARTIFACT_PATH, cli_version, ARTIFACT_TYPE)  # pylint: disable=line-too-long
+        if download_success:
+            tempList = what_model_files_to_delete(artifact_file_path, ARTIFACT_EXAMPLE_FILE_NAME, current_model_file_path)  # pylint: disable=line-too-long
+            delete_model_files(tempList)

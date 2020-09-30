@@ -118,3 +118,18 @@ def download_artifact(file_path, file_name, acr_name, artifact_path, artifact_ve
         # TODO: Add some sort of logging and consider checking for other failures and exceptions
         print("Aladdin download failed {}".format(exc))
         return False
+
+
+def does_current_cli_artifact_exist(acr_name, artifact_path, artifact_version):
+    try:
+        ping_response = ping_acr(acr_name, artifact_path, artifact_version)
+        (realm, service, scope) = extract_auth_values(ping_response)
+        auth_response = get_auth_token(realm, service, scope)
+        bearer_token = extract_auth_token(auth_response)
+        ping_response_auth = ping_acr(acr_name, artifact_path, artifact_version, bearer_token)
+        if ping_response_auth.status_code == 200:
+            return True
+    except httpx.RequestError:
+        # TODO: Add some sort of logging and consider checking for other failures and exceptions
+        pass
+    return False
