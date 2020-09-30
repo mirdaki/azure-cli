@@ -5,6 +5,7 @@
 
 import sys
 
+
 def style_message(msg):
     if should_enable_styling():
         import colorama  # pylint: disable=import-error

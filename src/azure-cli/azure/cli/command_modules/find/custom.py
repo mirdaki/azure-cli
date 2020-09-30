@@ -63,7 +63,7 @@ def process_query(cmd, cli_term):
         artifact_file_path = os.path.join(config.config_dir, ARTIFACT_FOLDER_NAME)
 
         # Use this to check if we are in an air-gapped cloud or not
-        is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name in CLOUDS_FORBIDDING_ALADDIN_REQUEST
+        is_air_gapped_cloud = cmd.cli_ctx and cmd.cli_ctx.cloud and cmd.cli_ctx.cloud.name in CLOUDS_FORBIDDING_ALADDIN_REQUEST  # pylint: disable=line-too-long
 
         # Check if the offline model is enabled and exists, even a prior version
         model_file_path = get_model_file(artifact_file_path, ARTIFACT_EXAMPLE_FILE_NAME, cli_version)
@@ -84,7 +84,7 @@ def process_query(cmd, cli_term):
             offline_config_prompt(config, is_air_gapped_cloud, artifact_file_path, artifact_file_name, False)
 
     # Wrap up message
-    print(MESSAGE_CHANGE_MODEL_DOWNLOAD_CONFIG.format(config.config_path, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_HEADER))
+    print(MESSAGE_CHANGE_MODEL_DOWNLOAD_CONFIG.format(config.config_path, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_HEADER))  # pylint: disable=line-too-long
     from azure.cli.core.util import show_updates_available
     show_updates_available(new_line_after=True)
     print(SURVEY_PROMPT)

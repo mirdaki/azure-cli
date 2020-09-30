@@ -17,6 +17,7 @@ from azure.cli.core import __version__ as core_version
 API_URL = 'https://app.aladdin.microsoft.com/api/{}/{}'
 API_VERSION = 'v1.0'
 
+
 def get_context():
     version = str(parse_version(core_version))
     correlation_id = telemetry_core._session.correlation_id   # pylint: disable=protected-access
@@ -49,7 +50,7 @@ def get_headers():
     return headers
 
 
-def call_aladdin_service(endpoint, additonal_params={}, version=API_VERSION, retry_count=3, timeout_seconds=360): # pylint: disable=dangerous-default-value
+def call_aladdin_service(endpoint, additonal_params={}, version=API_VERSION, retry_count=3, timeout_seconds=360):  # pylint: disable=dangerous-default-value
 
     context = get_context()
     api_url = API_URL.format(version, endpoint)
@@ -77,7 +78,7 @@ def call_aladdin_service(endpoint, additonal_params={}, version=API_VERSION, ret
             params=params,
             headers=headers,
             timeout=timeout_seconds)
-    except: # pylint: disable=bare-except
+    except:  # pylint: disable=bare-except
         response = Response()
         response.status_code = 503
 
