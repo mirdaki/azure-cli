@@ -9,23 +9,24 @@ from azure.cli.command_modules.find._aladdin_service import call_aladdin_service
 from azure.cli.command_modules.find.Example import Example
 
 
-EXAMPLE_ENDPOINT = 'examples'
+EXAMPLES_ENDPOINT = 'examples'
 
 
-# TODO: Should add json.dumps(cli_term) for all params?
-def get_examples(cli_term, strict):
+# TODO: Should add json.dumps(query) for all params?
+def get_examples(query, strict):
+    '''Request relevant example commands from Aladdin service. Strict forces all examples to match the query.'''
     examples = []
     pruned_examples = False
     call_successful = False
 
     params = {
-        'query': json.dumps(cli_term)
+        'query': json.dumps(query)
     }
     if strict:
         params['commandOnly'] = True
         params['numberOfExamples'] = 5
 
-    response = call_aladdin_service(EXAMPLE_ENDPOINT, params)
+    response = call_aladdin_service(EXAMPLES_ENDPOINT, params)
 
     if response and response.status_code == 200:
         call_successful = True
@@ -36,12 +37,12 @@ def get_examples(cli_term, strict):
             answers = answers[1:]
 
         for answer in answers:
-            examples.append(clean_from_http_answer(answer))
+            examples.append(_clean_from_http_answer(answer))
 
     return (call_successful, pruned_examples, examples)
 
 
-def clean_from_http_answer(http_answer):
+def _clean_from_http_answer(http_answer):
     current_title = http_answer['title'].strip()
     current_snippet = http_answer['snippet'].strip()
     if current_title.startswith("az "):

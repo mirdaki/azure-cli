@@ -3,46 +3,50 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 import json
-import os.path
 
 from azure.cli.command_modules.find.Example import Example
 
 # TODO: Get better names of some of these constants, variables, and functions
-BOOSTING_FACTOR_KEY = 'boosting_factor'
-C_KEY = 'c'
-COMMAND_KEY = 'command'
-DOC_IDS_KEY = 'doc_ids'
-IDF_KEY = 'idf'
-INDEX_KEY = 'index'
-K_KEY = 'k'
-POPULARITY_METRIC_KEY = 'popularity_metric'
-SCORE_KEY = 'score'
-T_KEY = 't'
+_BOOSTING_FACTOR_KEY = 'boosting_factor'
+_C_KEY = 'c'
+_COMMAND_KEY = 'command'
+_DOC_IDS_KEY = 'doc_ids'
+_IDF_KEY = 'idf'
+_INDEX_KEY = 'index'
+_K_KEY = 'k'
+_POPULARITY_METRIC_KEY = 'popularity_metric'
+_QUESTION_KEY = 'question'
+_SCORE_KEY = 'score'
+_T_KEY = 't'
 
 
-def search_examples(index_path, index_name, query, strict):
+def search_examples(model_path, query, strict):
+    '''Request relevant example commands from Aladdin model. Strict forces all examples to match the query.'''
     examples = []
     call_successful = False
     number_of_examples = 3
     command_weight = 0.5
+    query = query.string()
     if strict:
         number_of_examples = 5
 
     try:
-        results = search(index_path, index_name, query, number_of_examples, command_weight)
+        results = _search(model_path, query, number_of_examples, command_weight)
         if results:
             call_successful = True
             for result in results:
-                examples.append(clean_from_index_result(result))
+                example = _clean_from_index_result(result)
+                if strict and not (example.startswith(query) or example.startswith('az ' + query)):
+                    break
+                examples.append(_clean_from_index_result(result))
     except:  # pylint: disable=bare-except
         pass
 
     return (call_successful, examples)
 
 
-def search(index_path, index_name, query, number_of_examples=1, command_weight=0.5):
-    full_path = os.path.join(index_path, index_name)
-    with open(full_path, 'r') as file:
+def _search(model_path, query, number_of_examples=1, command_weight=0.5):
+    with open(model_path, 'r') as file:
         index = json.load(file)
 
     synonym_dict = index['synonym_dict']
@@ -87,72 +91,71 @@ def search(index_path, index_name, query, number_of_examples=1, command_weight=0
     # Deduplicate
     query_terms = set(query_terms)
 
-    docs = get_documents(query_terms, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight)
+    docs = _get_documents(query_terms, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight)
 
-    return process_documents(docs, index_dict, number_of_examples)
+    return _process_documents(docs, index_dict, number_of_examples)
 
 
-def get_documents(query_terms, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight):
+def _get_documents(query_terms, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight):
     docs = {}
     for t in query_terms:
         if t in inverse_index_dict:
-            doc_k = set(inverse_index_dict[t][DOC_IDS_KEY])
-            idf_k = inverse_index_dict[t][IDF_KEY]
+            doc_k = set(inverse_index_dict[t][_DOC_IDS_KEY])
+            idf_k = inverse_index_dict[t][_IDF_KEY]
         else:
             doc_k = set()
             idf_k = 0
         if t in inverse_command_index_dict:
-            doc_c = set(inverse_command_index_dict[t][DOC_IDS_KEY])
-            idf_c = inverse_command_index_dict[t][IDF_KEY]
+            doc_c = set(inverse_command_index_dict[t][_DOC_IDS_KEY])
+            idf_c = inverse_command_index_dict[t][_IDF_KEY]
         else:
             doc_c = set()
             idf_c = 0
 
         for d in doc_k:
             str_d = str(d)
-            doc_term_weight_k = index_dict[str_d][BOOSTING_FACTOR_KEY] * idf_k * (1 - command_weight)
+            doc_term_weight_k = index_dict[str_d][_BOOSTING_FACTOR_KEY] * idf_k * (1 - command_weight)
             if d in docs:
-                docs[d][T_KEY] += doc_term_weight_k
-                docs[d][K_KEY] += doc_term_weight_k
+                docs[d][_T_KEY] += doc_term_weight_k
+                docs[d][_K_KEY] += doc_term_weight_k
             else:
-                docs[d] = {T_KEY: doc_term_weight_k, K_KEY: doc_term_weight_k, C_KEY: 0}
+                docs[d] = {_T_KEY: doc_term_weight_k, _K_KEY: doc_term_weight_k, _C_KEY: 0}
 
         for d in doc_c:
-            doc_term_weight_c = index_dict[str(d)][BOOSTING_FACTOR_KEY] * idf_c * (command_weight)
+            doc_term_weight_c = index_dict[str(d)][_BOOSTING_FACTOR_KEY] * idf_c * (command_weight)
             if d in docs:
-                docs[d][T_KEY] += doc_term_weight_c
-                docs[d][C_KEY] += doc_term_weight_c
+                docs[d][_T_KEY] += doc_term_weight_c
+                docs[d][_C_KEY] += doc_term_weight_c
             else:
-                docs[d] = {T_KEY: doc_term_weight_c, K_KEY: 0, C_KEY: doc_term_weight_c}
+                docs[d] = {_T_KEY: doc_term_weight_c, _K_KEY: 0, _C_KEY: doc_term_weight_c}
 
     docs = [(key, val) for key, val in docs.items()]
-    docs.sort(key=lambda x: x[1][T_KEY], reverse=True)
+    docs.sort(key=lambda x: x[1][_T_KEY], reverse=True)
     return docs
 
 
-def process_documents(docs, index_dict, number_of_examples):
+def _process_documents(docs, index_dict, number_of_examples):
     result = []
     size = 0
     already_present_commands = {}
     for (k, v) in docs:
         r = index_dict[str(k)]
-        c = r[COMMAND_KEY].split(' -')[0]
+        c = r[_COMMAND_KEY].split(' -')[0]
         if c in already_present_commands:
-            if already_present_commands[c][SCORE_KEY] == v and already_present_commands[c][POPULARITY_METRIC_KEY] < r[POPULARITY_METRIC_KEY]:  # pylint: disable=line-too-long
-                r[SCORE_KEY] = v
-                result[already_present_commands[c][INDEX_KEY]] = r
-                already_present_commands[c][POPULARITY_METRIC_KEY] = r[POPULARITY_METRIC_KEY]
+            if already_present_commands[c][_SCORE_KEY] == v and already_present_commands[c][_POPULARITY_METRIC_KEY] < r[_POPULARITY_METRIC_KEY]:  # pylint: disable=line-too-long
+                r[_SCORE_KEY] = v
+                result[already_present_commands[c][_INDEX_KEY]] = r
+                already_present_commands[c][_POPULARITY_METRIC_KEY] = r[_POPULARITY_METRIC_KEY]
         else:
-            already_present_commands[c] = {INDEX_KEY: size, SCORE_KEY: v, POPULARITY_METRIC_KEY: r[POPULARITY_METRIC_KEY]}  # pylint: disable=line-too-long
-            r[SCORE_KEY] = v
+            already_present_commands[c] = {_INDEX_KEY: size, _SCORE_KEY: v, _POPULARITY_METRIC_KEY: r[_POPULARITY_METRIC_KEY]}  # pylint: disable=line-too-long
+            r[_SCORE_KEY] = v
             result.append(r)
             size += 1
             if size >= number_of_examples:
                 break
-
-    result.sort(key=lambda x: x[SCORE_KEY][T_KEY] + x[POPULARITY_METRIC_KEY] / 100000000000, reverse=True)
+    result.sort(key=lambda x: x[_SCORE_KEY][_T_KEY] + x[_POPULARITY_METRIC_KEY] / 100000000000, reverse=True)
     return result
 
 
-def clean_from_index_result(index_result):
-    return Example("", index_result[COMMAND_KEY])
+def _clean_from_index_result(index_result):
+    return Example(index_result[_QUESTION_KEY], index_result[COMMAND_KEY])

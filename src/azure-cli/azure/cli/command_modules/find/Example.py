@@ -6,3 +6,4 @@ from collections import namedtuple
 
 
 Example = namedtuple("Example", "title snippet")
+'''Describes a CLI help example.'''
