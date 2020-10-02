@@ -26,7 +26,7 @@ def search_examples(model_path, query, strict):
     call_successful = False
     number_of_examples = 3
     command_weight = 0.5
-    query = query.string()
+    query = query.strip()
     if strict:
         number_of_examples = 5
 
@@ -36,7 +36,7 @@ def search_examples(model_path, query, strict):
             call_successful = True
             for result in results:
                 example = _clean_from_index_result(result)
-                if strict and not (example.startswith(query) or example.startswith('az ' + query)):
+                if strict and not (example.snippet.startswith(query) or example.snippet.startswith('az ' + query)):
                     break
                 examples.append(_clean_from_index_result(result))
     except:  # pylint: disable=bare-except
@@ -157,5 +157,13 @@ def _process_documents(docs, index_dict, number_of_examples):
     return result
 
 
+def _convert_to_model_version(version):
+    parts = ['00000000', '00000000', '00000000', '00000000']
+    version_break_down = version.split('.')
+    for i in len(version_break_down):
+        parts[i] = version_break_down[i].zfill(8)
+    return '{}.{}.{}.{}'.format(parts[0], parts[1], parts[2], parts[3])
+
+
 def _clean_from_index_result(index_result):
-    return Example(index_result[_QUESTION_KEY], index_result[COMMAND_KEY])
+    return Example(index_result[_QUESTION_KEY], index_result[_COMMAND_KEY])

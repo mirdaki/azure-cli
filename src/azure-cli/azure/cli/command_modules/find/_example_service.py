@@ -5,7 +5,7 @@
 import re
 import json
 
-from azure.cli.command_modules.find._aladdin_service import call_aladdin_service
+from azure.cli.command_modules.find.aladdin_service import call_aladdin_service
 from azure.cli.command_modules.find.Example import Example
 
 
