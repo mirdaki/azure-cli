@@ -62,11 +62,11 @@ def process_query(cmd, cli_term, yes=None):
             (call_successful, pruned_examples, examples) = get_examples(cli_term, False)
             # If the service call fails, try the local backup
             if not call_successful and is_offline_enabled and active_model_path:
-                (call_successful, examples) = _search_example_model_and_clean(active_model_path, cli_term, model_directory)  # pylint: disable=line-too-long
+                (call_successful, examples) = _search_example_model_and_clean(active_model_path, cli_term, cli_version, model_directory)  # pylint: disable=line-too-long
             _print_examples(cli_term, call_successful, pruned_examples, examples)
 
         elif is_air_gapped_cloud and is_offline_enabled and active_model_path:
-            (call_successful, examples) = _search_example_model_and_clean(active_model_path, cli_term, model_directory)
+            (call_successful, examples) = _search_example_model_and_clean(active_model_path, cli_term, cli_version, model_directory)  # pylint: disable=line-too-long
             _print_examples(cli_term, call_successful, False, examples)
 
         else:
@@ -125,9 +125,9 @@ def _offline_config_prompt(config, model_directory, cli_version, yes_flag):
         config.set_value(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_DISABLE_VALUE)
 
 
-def _search_example_model_and_clean(active_model_path, cli_term, model_directory):
+def _search_example_model_and_clean(active_model_path, cli_term, cli_version, model_directory):
     # Whenever the model is used, check to see if there are old ones to be cleaned up
-    (call_successful, examples) = search_examples(active_model_path, cli_term, False)
+    (call_successful, examples) = search_examples(active_model_path, cli_term, cli_version, False)
     _clean_up_old_models(model_directory, EXAMPLE_MODEL_NAME_PATTERN, active_model_path)
     return (call_successful, examples)
 

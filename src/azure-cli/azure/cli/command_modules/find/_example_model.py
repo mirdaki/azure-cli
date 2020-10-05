@@ -6,7 +6,7 @@ import json
 
 from azure.cli.command_modules.find.Example import Example
 
-# TODO: Get better names of some of these constants, variables, and functions
+
 _BOOSTING_FACTOR_KEY = 'boosting_factor'
 _C_KEY = 'c'
 _COMMAND_KEY = 'command'
@@ -14,13 +14,15 @@ _DOC_IDS_KEY = 'doc_ids'
 _IDF_KEY = 'idf'
 _INDEX_KEY = 'index'
 _K_KEY = 'k'
+_MAX_VERSION_KEY = 'max_version'
+_MIN_VERSION_KEY = 'min_version'
 _POPULARITY_METRIC_KEY = 'popularity_metric'
 _QUESTION_KEY = 'question'
 _SCORE_KEY = 'score'
 _T_KEY = 't'
 
 
-def search_examples(model_path, query, strict):
+def search_examples(model_path, query, cli_version, strict):
     '''Request relevant example commands from Aladdin model. Strict forces all examples to match the query.'''
     examples = []
     call_successful = False
@@ -31,7 +33,7 @@ def search_examples(model_path, query, strict):
         number_of_examples = 5
 
     try:
-        results = _search(model_path, query, number_of_examples, command_weight)
+        results = _search(model_path, query, number_of_examples, _convert_to_model_version(cli_version), command_weight)
         if results:
             call_successful = True
             for result in results:
@@ -45,7 +47,7 @@ def search_examples(model_path, query, strict):
     return (call_successful, examples)
 
 
-def _search(model_path, query, number_of_examples=1, command_weight=0.5):
+def _search(model_path, query, number_of_examples=1, version=-1, command_weight=0.5):
     with open(model_path, 'r') as file:
         index = json.load(file)
 
@@ -91,12 +93,12 @@ def _search(model_path, query, number_of_examples=1, command_weight=0.5):
     # Deduplicate
     query_terms = set(query_terms)
 
-    docs = _get_documents(query_terms, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight)
+    docs = _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight)  # pylint: disable=line-too-long
 
     return _process_documents(docs, index_dict, number_of_examples)
 
 
-def _get_documents(query_terms, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight):
+def _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight):
     docs = {}
     for t in query_terms:
         if t in inverse_index_dict:
@@ -114,6 +116,11 @@ def _get_documents(query_terms, index_dict, inverse_index_dict, inverse_command_
 
         for d in doc_k:
             str_d = str(d)
+            if version >= 0:
+                if int(index_dict[str_d][_MAX_VERSION_KEY]) > 0:
+                    if version < int(index_dict[str_d][_MIN_VERSION_KEY]) or version > int(index_dict[str_d][_MAX_VERSION_KEY]):  # pylint: disable=line-too-long
+                        continue
+
             doc_term_weight_k = index_dict[str_d][_BOOSTING_FACTOR_KEY] * idf_k * (1 - command_weight)
             if d in docs:
                 docs[d][_T_KEY] += doc_term_weight_k
@@ -122,6 +129,12 @@ def _get_documents(query_terms, index_dict, inverse_index_dict, inverse_command_
                 docs[d] = {_T_KEY: doc_term_weight_k, _K_KEY: doc_term_weight_k, _C_KEY: 0}
 
         for d in doc_c:
+            str_c = str(d)
+            if version >= 0:
+                if int(index_dict[str_c][_MAX_VERSION_KEY]) > 0:
+                    if version < int(index_dict[str_c][_MIN_VERSION_KEY]) or version > int(index_dict[str_c][_MAX_VERSION_KEY]):  # pylint: disable=line-too-long
+                        continue
+
             doc_term_weight_c = index_dict[str(d)][_BOOSTING_FACTOR_KEY] * idf_c * (command_weight)
             if d in docs:
                 docs[d][_T_KEY] += doc_term_weight_c
@@ -158,11 +171,12 @@ def _process_documents(docs, index_dict, number_of_examples):
 
 
 def _convert_to_model_version(version):
+    version = version.strip('v')
     parts = ['00000000', '00000000', '00000000', '00000000']
     version_break_down = version.split('.')
-    for i in len(version_break_down):
+    for i in range(len(version_break_down)):  # pylint: disable=consider-using-enumerate
         parts[i] = version_break_down[i].zfill(8)
-    return '{}.{}.{}.{}'.format(parts[0], parts[1], parts[2], parts[3])
+    return int('{}{}{}{}'.format(parts[0], parts[1], parts[2], parts[3]))
 
 
 def _clean_from_index_result(index_result):
