@@ -36,16 +36,16 @@ logger = get_logger(__name__)
 #  - If the last used model works, delete all the other ones
 #  - If the current version is not downloaded and it's been long enough since the last check, check to download
 
-# TODO: Expose all the model settings as a new command group
 # TODO: Make sure the artifact type is specific to examples
 
 def process_query(cmd, cli_term, yes=None):
+    '''Called via `az find`. Used to get example CLI commands based off of the query.'''
     if not cli_term:
         logger.error(MESSAGE_TERM_NOT_PROVIDED_ERROR)
     else:
         config = cmd.cli_ctx.config
         model_directory = os.path.join(config.config_dir, MODEL_FOLDER_NAME)
-        cli_version = 'v{}'.format(telemetry_core._get_core_version())  # pylint: disable=protected-access
+        cli_version = CLI_VERSION_FORMAT.format(telemetry_core._get_core_version())  # pylint: disable=protected-access
         example_model_name_for_version = EXAMPLE_MODEL_NAME_PATTERN.format(cli_version)
 
         # Use this to check if we are in an air-gapped cloud or not
@@ -85,6 +85,45 @@ def process_query(cmd, cli_term, yes=None):
     from azure.cli.core.util import show_updates_available
     show_updates_available(new_line_after=True)
     print(SURVEY_PROMPT)
+
+
+def update_offline_model(cmd):
+    '''Called via `az find offline update`. Used to update to the latest available offline model.'''
+    config = cmd.cli_ctx.config
+    model_directory = os.path.join(config.config_dir, MODEL_FOLDER_NAME)
+    cli_version = CLI_VERSION_FORMAT.format(telemetry_core._get_core_version())  # pylint: disable=protected-access
+
+    print(MESSAGE_OFFLINE_UPDATE)
+    download_success = _update_model_if_available(model_directory, cli_version)
+    if download_success:
+        print(MESSAGE_OFFLINE_UPDATE_SUCCESS)
+    else:
+        print(MESSAGE_OFFLINE_UPDATE_FAIL)
+
+
+def delete_offline_model(cmd):
+    '''Called via `az find offline delete`. Used to delete the locally downloaded offline models.'''
+    config = cmd.cli_ctx.config
+    model_directory = os.path.join(config.config_dir, MODEL_FOLDER_NAME)
+
+    print(MESSAGE_OFFLINE_DELETE)
+    _clean_up_old_models(model_directory, EXAMPLE_MODEL_NAME_PATTERN, '')
+
+
+def enable_offline_model(cmd):
+    '''Called via `az find offline enable`. Used to enable the use of offline models.'''
+    config = cmd.cli_ctx.config
+
+    print(MESSAGE_OFFLINE_ENABLE)
+    config.set_value(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_ENABLE_VALUE)
+
+
+def disable_offline_model(cmd):
+    '''Called via `az find offline disable`. Used to disable the use of offline models.'''
+    config = cmd.cli_ctx.config
+
+    print(MESSAGE_OFFLINE_DISABLE)
+    config.set_value(CONFIG_HEADER, CONFIG_SHOULD_DOWNLOAD_ARTIFACT, CONFIG_DISABLE_VALUE)
 
 
 def _print_examples(cli_term, call_successful, pruned_examples, examples):

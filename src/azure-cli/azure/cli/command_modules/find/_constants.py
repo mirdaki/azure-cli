@@ -8,6 +8,7 @@ ARTIFACT_PATH = 'aladdin/cli'
 ARTIFACT_TYPE = 'application/vnd.microsoft.aladdin-model.cli.layer.v1.json'
 EXAMPLE_MODEL_NAME_PATTERN = 'aladdinExamplesModel{}.json'
 MODEL_FOLDER_NAME = 'aladdin'
+CLI_VERSION_FORMAT = 'v{}'
 
 CONFIG_DISABLE_VALUE = 'False'
 CONFIG_ENABLE_VALUE = 'True'
@@ -28,5 +29,13 @@ MESSAGE_MODEL_DOWNLOAD_END = 'Model successfully downloaded.'
 MESSAGE_MODEL_DOWNLOAD_ERROR = 'Something went wrong. Please try again later. Please report the problem if it persist.'
 MESSAGE_MODEL_DOWNLOAD_START = 'Downloading, this may take a moment.'
 MESSAGE_WAIT = 'Finding examples...'
+
+MESSAGE_OFFLINE_UPDATE = 'Attempting to update to the latest available offline model.'
+MESSAGE_OFFLINE_UPDATE_SUCCESS = 'Successfully updated.'
+MESSAGE_OFFLINE_UPDATE_FAIL = 'Update failed.'
+MESSAGE_OFFLINE_DELETE = 'Deleting all downloaded offline models.'
+MESSAGE_OFFLINE_ENABLE = 'Enabling offline model. To download the latest model, use the `find offline update` command.'
+MESSAGE_OFFLINE_DISABLE = 'Disabling offline model.'
+
 
 PROMPT_DOWNLOAD_MODEL = 'Would you like to download a model for offline use (option can be changed in the config file) (y/n): '  # pylint: disable=line-too-long
