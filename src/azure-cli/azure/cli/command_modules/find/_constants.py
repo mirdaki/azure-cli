@@ -4,8 +4,8 @@
 # --------------------------------------------------------------------------------------------
 ACR_LATEST_TAG = 'latest'
 ACR_NAME = 'aladdinmodel'
-ARTIFACT_PATH = 'aladdin/cli'
-ARTIFACT_TYPE = 'application/vnd.microsoft.aladdin-model.cli.layer.v1.json'
+ARTIFACT_PATH = 'aladdin/cli/examples'
+ARTIFACT_TYPE = 'application/vnd.microsoft.aladdin-model.cli.examples.layer.v1.json'
 EXAMPLE_MODEL_NAME_PATTERN = 'aladdinExamplesModel{}.json'
 MODEL_FOLDER_NAME = 'aladdin'
 CLI_VERSION_FORMAT = 'v{}'

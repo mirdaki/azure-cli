@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 #  - If the last used model works, delete all the other ones
 #  - If the current version is not downloaded and it's been long enough since the last check, check to download
 
-# TODO: Make sure the artifact type is specific to examples
+# TODO: Check what happens when enabled but not downloaded
 
 def process_query(cmd, cli_term, yes=None):
     '''Called via `az find`. Used to get example CLI commands based off of the query.'''
@@ -62,12 +62,12 @@ def process_query(cmd, cli_term, yes=None):
             (call_successful, pruned_examples, examples) = get_examples(cli_term, False)
             # If the service call fails, try the local backup
             if not call_successful and is_offline_enabled and active_model_path:
-                (call_successful, examples) = _search_example_model_and_clean(active_model_path, cli_term, cli_version, model_directory)  # pylint: disable=line-too-long
+                (call_successful, pruned_examples, examples) = _search_example_model_and_clean(active_model_path, cli_term, cli_version, model_directory)  # pylint: disable=line-too-long
             _print_examples(cli_term, call_successful, pruned_examples, examples)
 
         elif is_air_gapped_cloud and is_offline_enabled and active_model_path:
-            (call_successful, examples) = _search_example_model_and_clean(active_model_path, cli_term, cli_version, model_directory)  # pylint: disable=line-too-long
-            _print_examples(cli_term, call_successful, False, examples)
+            (call_successful, pruned_examples, examples) = _search_example_model_and_clean(active_model_path, cli_term, cli_version, model_directory)  # pylint: disable=line-too-long
+            _print_examples(cli_term, call_successful, pruned_examples, examples)
 
         else:
             print(MESSAGE_AIR_GAPPED_MODEL_NEEDED)
@@ -166,9 +166,9 @@ def _offline_config_prompt(config, model_directory, cli_version, yes_flag):
 
 def _search_example_model_and_clean(active_model_path, cli_term, cli_version, model_directory):
     # Whenever the model is used, check to see if there are old ones to be cleaned up
-    (call_successful, examples) = search_examples(active_model_path, cli_term, cli_version, False)
+    (call_successful, pruned_examples, examples) = search_examples(active_model_path, cli_term, cli_version, False)
     _clean_up_old_models(model_directory, EXAMPLE_MODEL_NAME_PATTERN, active_model_path)
-    return (call_successful, examples)
+    return (call_successful, pruned_examples, examples)
 
 
 def _get_best_available_model(model_directory, model_name_pattern, cli_version):

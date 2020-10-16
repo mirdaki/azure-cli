@@ -26,6 +26,7 @@ def search_examples(model_path, query, cli_version, strict):
     '''Request relevant example commands from Aladdin model. Strict forces all examples to match the query.'''
     examples = []
     call_successful = False
+    pruned_examples = False
     number_of_examples = 3
     command_weight = 0.5
     query = query.strip()
@@ -33,7 +34,7 @@ def search_examples(model_path, query, cli_version, strict):
         number_of_examples = 5
 
     try:
-        results = _search(model_path, query, number_of_examples, _convert_to_model_version(cli_version), command_weight)
+        (results, pruned_examples) = _search(model_path, query, number_of_examples, _convert_to_model_version(cli_version), command_weight)  # pylint: disable=line-too-long
         if results:
             call_successful = True
             for result in results:
@@ -44,7 +45,7 @@ def search_examples(model_path, query, cli_version, strict):
     except:  # pylint: disable=bare-except
         pass
 
-    return (call_successful, examples)
+    return (call_successful, pruned_examples, examples)
 
 
 def _search(model_path, query, number_of_examples=1, version=-1, command_weight=0.5):
@@ -93,13 +94,16 @@ def _search(model_path, query, number_of_examples=1, version=-1, command_weight=
     # Deduplicate
     query_terms = set(query_terms)
 
-    docs = _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight)  # pylint: disable=line-too-long
+    (docs, pruned_examples) = _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight)  # pylint: disable=line-too-long
 
-    return _process_documents(docs, index_dict, number_of_examples)
+    results = _process_documents(docs, index_dict, number_of_examples)
+
+    return (results, pruned_examples)
 
 
 def _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse_command_index_dict, command_weight):
     docs = {}
+    pruned_examples = False
     for t in query_terms:
         if t in inverse_index_dict:
             doc_k = set(inverse_index_dict[t][_DOC_IDS_KEY])
@@ -118,7 +122,9 @@ def _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse
             str_d = str(d)
             if version >= 0:
                 if int(index_dict[str_d][_MAX_VERSION_KEY]) > 0:
+                    # TODO: Should set pruned for greater than max version? Should exclude?
                     if version < int(index_dict[str_d][_MIN_VERSION_KEY]) or version > int(index_dict[str_d][_MAX_VERSION_KEY]):  # pylint: disable=line-too-long
+                        pruned_examples = True
                         continue
 
             doc_term_weight_k = index_dict[str_d][_BOOSTING_FACTOR_KEY] * idf_k * (1 - command_weight)
@@ -133,6 +139,7 @@ def _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse
             if version >= 0:
                 if int(index_dict[str_c][_MAX_VERSION_KEY]) > 0:
                     if version < int(index_dict[str_c][_MIN_VERSION_KEY]) or version > int(index_dict[str_c][_MAX_VERSION_KEY]):  # pylint: disable=line-too-long
+                        pruned_examples = True
                         continue
 
             doc_term_weight_c = index_dict[str(d)][_BOOSTING_FACTOR_KEY] * idf_c * (command_weight)
@@ -144,7 +151,7 @@ def _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse
 
     docs = [(key, val) for key, val in docs.items()]
     docs.sort(key=lambda x: x[1][_T_KEY], reverse=True)
-    return docs
+    return (docs, pruned_examples)
 
 
 def _process_documents(docs, index_dict, number_of_examples):
