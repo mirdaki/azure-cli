@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 #  - If the last used model works, delete all the other ones
 #  - If the current version is not downloaded and it's been long enough since the last check, check to download
 
-# TODO: Check what happens when enabled but not downloaded
+# TODO: Check what happens when enabled but not downloaded and the commands if they aren't already configured
 
 def process_query(cmd, cli_term, yes=None):
     '''Called via `az find`. Used to get example CLI commands based off of the query.'''

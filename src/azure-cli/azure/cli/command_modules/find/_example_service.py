@@ -52,5 +52,4 @@ def _clean_from_http_answer(http_answer):
         start_index = current_snippet.index('```azurecli\r\n') + len('```azurecli\r\n')
         current_snippet = current_snippet[start_index:]
     current_snippet = current_snippet.replace('```', '').replace(current_title, '').strip()
-    current_snippet = re.sub(r'\[.*\]', '', current_snippet).strip()
     return Example(current_title, current_snippet)
