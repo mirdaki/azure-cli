@@ -122,8 +122,7 @@ def _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse
             str_d = str(d)
             if version >= 0:
                 if int(index_dict[str_d][_MAX_VERSION_KEY]) > 0:
-                    # TODO: Should set pruned for greater than max version? Should exclude?
-                    if version < int(index_dict[str_d][_MIN_VERSION_KEY]) or version > int(index_dict[str_d][_MAX_VERSION_KEY]):  # pylint: disable=line-too-long
+                    if version < int(index_dict[str_d][_MIN_VERSION_KEY]):
                         pruned_examples = True
                         continue
 
@@ -138,7 +137,7 @@ def _get_documents(query_terms, version, index_dict, inverse_index_dict, inverse
             str_c = str(d)
             if version >= 0:
                 if int(index_dict[str_c][_MAX_VERSION_KEY]) > 0:
-                    if version < int(index_dict[str_c][_MIN_VERSION_KEY]) or version > int(index_dict[str_c][_MAX_VERSION_KEY]):  # pylint: disable=line-too-long
+                    if version < int(index_dict[str_c][_MIN_VERSION_KEY]):
                         pruned_examples = True
                         continue
 
