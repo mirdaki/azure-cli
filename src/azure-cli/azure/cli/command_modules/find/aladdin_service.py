@@ -65,11 +65,9 @@ def _get_context():
     version = str(parse_version(core_version))
     correlation_id = telemetry_core._session.correlation_id   # pylint: disable=protected-access
     subscription_id = telemetry_core._get_azure_subscription_id()  # pylint: disable=protected-access
-    user_id = telemetry_core._get_user_azure_id()  # pylint: disable=protected-access
 
     context = {
         "versionNumber": version,
-        "userId": user_id
     }
 
     # Only pull in these contextual values if we have consent
@@ -86,7 +84,7 @@ def _get_headers():
     headers = {'Content-Type': 'application/json'}
 
     # Used for DDOS protection and rate limiting
-    user_id = telemetry_core._get_user_azure_id()  # pylint: disable=protected-access
+    user_id = telemetry_core._get_installation_id()  # pylint: disable=protected-access
     hashed_user_id = hashlib.sha256(user_id.encode('utf-8')).hexdigest()
     headers['X-UserId'] = hashed_user_id
 
